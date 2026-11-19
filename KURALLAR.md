@@ -62,6 +62,14 @@ Bu dosyadaki kararlar proje sahibinin onayıyla alınmıştır. **Hiçbir adımd
 1. Plan `PLAN.md`'dedir; adımlar sırayla uygulanır.
 2. **Her adım bitince `ILERLEME.md` güncellenir:** ne yapıldı, hangi dosyalar, neler doğrulandı, sıradaki adım.
 3. Bir adım doğrulanmadan (derleme / test) "bitti" denmez. Doğrulanamayan şey açıkça yazılır.
+4. **Yeni sürüm yayınlama** (uygulama içi güncelleme buna dayanır):
+   1. `app/build.gradle.kts`: `versionCode` +1, `versionName` artır (ör. 0.1.3)
+   2. `./gradlew clean testDebugUnitTest lintDebug assembleRelease` — testler ve lint temiz olmalı
+   3. `apksigner verify`: imza sertifikası `4D:76:FE:12…C8:42` olmalı (aynı anahtar)
+   4. `dist/Kairos-<sürüm>.apk` olarak kopyala, commit + push
+   5. `gh release create v<sürüm> dist/Kairos-<sürüm>.apk --repo beratoprak/kairos` (taslak/ön sürüm DEĞİL; uygulama onları görmez)
+   Yayın herkese açıktır: proje sahibi istemeden sürüm yayınlanmaz.
+5. Depo herkese açık (`github.com/beratoprak/kairos`, GPL-3.0). Commit'ler GitHub'ın gizli adresiyle (`…@users.noreply.github.com`) atılır; gerçek e-posta, imza anahtarı ve `local.properties` depoya girmez.
 
 ## Değişiklik geçmişi
 - 2026-11-19: Kurallar oluşturuldu (proje sahibi onayı).
@@ -72,4 +80,5 @@ Bu dosyadaki kararlar proje sahibinin onayıyla alınmıştır. **Hiçbir adımd
 - 2026-11-19: Uygulama simgesi proje sahibinin monokrom işaretiyle değiştirildi (§2.11); yayın imzası kuruldu (§3.10).
 - 2026-11-19: Test kullanıcısı geri bildirimiyle ekleme sayfası düzeni değişti (§2.8b), "asla taşma" kuralı eklendi (§2.8a). Hatırlatma kaydedilirken hatırlatmayı engelleyen bir izin kapalıysa açıklamalı izin penceresi gösterilir (açılışta en fazla bir kez, "Şimdi değil" ile kapatılır).
 - 2026-11-19: Proje sahibi istekleri: hatırlatma sesi yüksek (alarm ses düzeyinden; telefon sessiz/titreşimde veya sessiz saatlerde normal kanal) — varsayılan "Yüksek"; sesli özette robotik ses yerine en kaliteli Türkçe ses (Google motoru tercih edilir) ve ses seçici; uygulama içi güncelleme (§3.7 istisnası), açılışta denetim varsayılan açık.
+- 2026-11-19: Proje sahibi kararı: kod ve APK'lar herkese açık GitHub deposunda (GPL-3.0 kaynak kodu sunma şartı nedeniyle "sadece APK" seçeneği yerine). v0.1.2 yayınlandı.
 - 2026-11-19: `kairos-android-design-spec.md` sadece **simge** için verildi (proje sahibi açıkladı). Belgenin uygulama arayüzüyle ilgili maddeleri bu projenin tasarım kaynağı DEĞİLDİR; uygulanmaz.

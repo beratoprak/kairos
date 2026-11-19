@@ -5,7 +5,8 @@ Her adım bitince buraya eklenir. En yeni kayıt en üstte.
 ## Şu anki durum
 - **Durum:** Sürüm 1 planındaki 10 adımın kodu tamamlandı. **Gerçek cihazda henüz hiç çalıştırılmadı.**
 - **Sıradaki:** gerçek cihaz/emülatör testi; ardından PLAN.md'deki "Sürüm 1 için kalan küçük işler"
-- **Kurulabilir APK:** `dist/Kairos-0.1.2.apk` (imzalı release, sürüm kodu 3; önceki sürümlerin üzerine kurulur). Bu sürümden sonrası uygulama içinden güncellenecek (GitHub Releases hazırlanınca). Yeniden üretmek: `./gradlew assembleRelease` → `~/.kairos-build/app/outputs/apk/release/app-release.apk`
+- **Kurulabilir APK:** `dist/Kairos-0.1.2.apk` (imzalı release, sürüm kodu 3). Yayında: https://github.com/beratoprak/kairos/releases/tag/v0.1.2 — 0.1.2 kurulu telefonlar sonraki sürümleri uygulama içinden alır
+- **Depo:** https://github.com/beratoprak/kairos (herkese açık, GPL-3.0). Yayın adımları KURALLAR §4.4'te Yeniden üretmek: `./gradlew assembleRelease` → `~/.kairos-build/app/outputs/apk/release/app-release.apk`
 - **İmza anahtarı:** `~/.kairos-keys/` (anahtar + şifre dosyası, sadece kullanıcı okuyabilir). **Yedeklenmeli**; kaybolursa uygulama güncellenemez
 - **Geliştirme ortamı:** Java 17 (Temurin), Android SDK (platform 34/36, build-tools 34–36) `~/Library/Android/sdk`, Gradle 8.14.3 (wrapper), AGP 8.11.0, Kotlin 2.1.20, Compose BOM 2025.05.01
 - **Derleme komutu:** `./gradlew assembleDebug` → `~/.kairos-build/app/outputs/apk/debug/app-debug.apk`
@@ -32,7 +33,7 @@ Her adım bitince buraya eklenir. En yeni kayıt en üstte.
 - `UpdateCheckerTest` (3), yüksek ses kanalı testi (alarm düzeyi; titreşimde/sessiz saatte normal kanal), varsayılanlar testi güncellendi
 
 **Açık**
-- GitHub deposu ve ilk sürüm yayını proje sahibinin onayını bekliyor (güncelleme düğmesi o zamana kadar "Güncel" der)
+- ~~GitHub deposu~~ → açıldı (herkese açık, kod + APK; GPL şartı nedeniyle). v0.1.2 yayında; canlı API yanıtı ve indirilen APK'nın yerel dosyayla birebir aynı olduğu doğrulandı. Commit'lerdeki gerçek e-posta GitHub gizli adresiyle değiştirildi
 - Xiaomi: test telefonunda adımlar uygulandı mı bilinmiyor; gerekirse "alarm saati modu" (setAlarmClock) önerilecek — KURALLAR §3.4 değişikliği, onay gerekir
 - Gerçek ses kalitesi ve güncelleme akışı cihazda denenmedi
 
