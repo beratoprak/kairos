@@ -3,7 +3,8 @@ package app.kairos.alarm
 import app.kairos.data.Reminder
 import java.time.ZoneId
 
-enum class AlarmKind { DUE, LEAD }
+/** DUE: asıl hatırlatma, LEAD: önceden hatırlatma, TEST: Ayarlar'daki deneme bildirimi. */
+enum class AlarmKind { DUE, LEAD, TEST }
 
 /** Kurulacak tek bir alarm. */
 data class PlannedAlarm(val reminderId: Long, val kind: AlarmKind, val atMillis: Long)

@@ -1,5 +1,6 @@
 package app.kairos.ui.editor
 
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
@@ -103,7 +104,8 @@ fun TimeRuler(minute: Int, onMinute: (Int) -> Unit, use24Hour: Boolean, modifier
         val top = 14.dp.toPx()
         val halfSpan = (center / pxPerMinute).toInt() + 15
         val first = ((shown.toInt() - halfSpan) / 15) * 15
-        val labelStyle = TimeStyles.Ruler
+        // Cetvel bir çizimdir: rakamlar yazı boyutu ayarıyla büyümez, ibreyle çakışmaz.
+        val labelStyle = TimeStyles.Ruler.copy(fontSize = 15.dp.toSp())
 
         var m = first
         while (m <= shown + halfSpan) {

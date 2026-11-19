@@ -83,6 +83,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val BRIEF_WHEN_SILENT = stringPreferencesKey("brief_when_silent")
         val BRIEF_CHANNEL = stringPreferencesKey("brief_channel")
         val BRIEF_RATE = floatPreferencesKey("brief_speech_rate")
+        val BRIEF_VOICE = stringPreferencesKey("brief_voice")
 
         val NEW_TIME_MODE = stringPreferencesKey("new_time_mode")
         val NEW_FIXED_MINUTE = intPreferencesKey("new_fixed_minute")
@@ -99,6 +100,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val QUIET_ENABLED = booleanPreferencesKey("quiet_enabled")
         val QUIET_START = intPreferencesKey("quiet_start")
         val QUIET_END = intPreferencesKey("quiet_end")
+        val REMINDER_VOLUME = stringPreferencesKey("reminder_volume")
 
         val SWIPE_RIGHT = stringPreferencesKey("swipe_right")
         val SWIPE_LEFT = stringPreferencesKey("swipe_left")
@@ -107,6 +109,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val BRIEF_ASKED = booleanPreferencesKey("brief_question_asked")
         val DISMISSED_RELIABILITY = stringPreferencesKey("dismissed_reliability")
+        val UPDATE_CHECK_ON_LAUNCH = booleanPreferencesKey("update_check_on_launch")
     }
 
     companion object {
@@ -142,6 +145,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
                     whenSilentMode = enumOr(p[K.BRIEF_WHEN_SILENT], d.brief.whenSilentMode),
                     channel = enumOr(p[K.BRIEF_CHANNEL], d.brief.channel),
                     speechRate = (p[K.BRIEF_RATE] ?: d.brief.speechRate).coerceIn(0.5f, 2.0f),
+                    voiceName = p[K.BRIEF_VOICE],
                 ),
                 newReminder = NewReminder(
                     timeMode = enumOr(p[K.NEW_TIME_MODE], d.newReminder.timeMode),
@@ -162,6 +166,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
                     quietHoursEnabled = p[K.QUIET_ENABLED] ?: d.notifications.quietHoursEnabled,
                     quietStartMinute = p[K.QUIET_START] ?: d.notifications.quietStartMinute,
                     quietEndMinute = p[K.QUIET_END] ?: d.notifications.quietEndMinute,
+                    volume = enumOr(p[K.REMINDER_VOLUME], d.notifications.volume),
                 ),
                 list = ListBehavior(
                     swipeRight = enumOr(p[K.SWIPE_RIGHT], d.list.swipeRight),
@@ -173,6 +178,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
                     briefQuestionAsked = p[K.BRIEF_ASKED] ?: d.onboarding.briefQuestionAsked,
                     dismissedReliability = p[K.DISMISSED_RELIABILITY],
                 ),
+                updates = Updates(checkOnLaunch = p[K.UPDATE_CHECK_ON_LAUNCH] ?: d.updates.checkOnLaunch),
             )
         }
 
@@ -192,6 +198,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             p[K.BRIEF_WHEN_SILENT] = s.brief.whenSilentMode.name
             p[K.BRIEF_CHANNEL] = s.brief.channel.name
             p[K.BRIEF_RATE] = s.brief.speechRate
+            s.brief.voiceName?.let { p[K.BRIEF_VOICE] = it } ?: p.remove(K.BRIEF_VOICE)
 
             p[K.NEW_TIME_MODE] = s.newReminder.timeMode.name
             p[K.NEW_FIXED_MINUTE] = s.newReminder.fixedMinute
@@ -208,6 +215,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             p[K.QUIET_ENABLED] = s.notifications.quietHoursEnabled
             p[K.QUIET_START] = s.notifications.quietStartMinute
             p[K.QUIET_END] = s.notifications.quietEndMinute
+            p[K.REMINDER_VOLUME] = s.notifications.volume.name
 
             p[K.SWIPE_RIGHT] = s.list.swipeRight.name
             p[K.SWIPE_LEFT] = s.list.swipeLeft.name
@@ -216,6 +224,7 @@ class SettingsStore(private val store: DataStore<Preferences>) {
             p[K.ONBOARDING_DONE] = s.onboarding.completed
             p[K.BRIEF_ASKED] = s.onboarding.briefQuestionAsked
             s.onboarding.dismissedReliability?.let { p[K.DISMISSED_RELIABILITY] = it } ?: p.remove(K.DISMISSED_RELIABILITY)
+            p[K.UPDATE_CHECK_ON_LAUNCH] = s.updates.checkOnLaunch
         }
     }
 }

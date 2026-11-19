@@ -15,6 +15,12 @@ class AppSettingsDefaultsTest {
     private val fresh = SettingsStore.read(emptyPreferences())
 
     @Test fun dailyBriefIsOffByDefault() = assertFalse(fresh.brief.enabled)
+    /** Proje sahibinin isteği: hatırlatma sesi yüksek, açılışta güncelleme denetimi açık. */
+    @Test fun ownerRequestedDefaults() {
+        assertEquals(ReminderVolume.LOUD, fresh.notifications.volume)
+        assertEquals(true, fresh.updates.checkOnLaunch)
+        assertNull(fresh.brief.voiceName)
+    }
     @Test fun overdueIsNotSpokenByDefault() = assertFalse(fresh.brief.includeOverdue)
     @Test fun briefStaysSilentWhenNothingDue() = assertEquals(WhenNone.STAY_SILENT, fresh.brief.whenNone)
     @Test fun briefDoesNotSpeakInSilentMode() = assertEquals(WhenSilentMode.NOTIFY_ONLY, fresh.brief.whenSilentMode)
@@ -34,13 +40,14 @@ class AppSettingsDefaultsTest {
             brief = DailyBrief(
                 enabled = true, minute = 7 * 60 + 30, days = setOf(1, 2, 3, 4, 5), weekendDifferent = true,
                 weekendMinute = 9 * 60, includeOverdue = true, whenNone = WhenNone.SAY_NONE,
-                whenSilentMode = WhenSilentMode.SKIP, channel = AudioChannel.ALARM, speechRate = 1.25f,
+                whenSilentMode = WhenSilentMode.SKIP, channel = AudioChannel.ALARM, speechRate = 1.25f, voiceName = "tr-tr-x-ama-local",
             ),
             newReminder = NewReminder(
                 timeMode = DefaultTimeMode.FIXED, fixedMinute = 600, lastUsedMinute = 720,
                 dayParts = DayParts(480, 750, 1080, 1290), defaultLeadMinutes = 15,
             ),
-            notifications = Notifications(5, true, 15, true, 22 * 60, 6 * 60),
+            notifications = Notifications(5, true, 15, true, 22 * 60, 6 * 60, ReminderVolume.NORMAL),
+            updates = Updates(checkOnLaunch = false),
             list = ListBehavior(SwipeAction.DELETE, SwipeAction.NONE, 30),
             onboarding = Onboarding(completed = true, briefQuestionAsked = true),
         )

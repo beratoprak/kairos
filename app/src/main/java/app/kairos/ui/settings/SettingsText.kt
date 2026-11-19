@@ -58,4 +58,9 @@ object SettingsText {
     val purgeOptions: List<Int?> = listOf(null, 7, 30, 90)
 
     val snoozeOptions = listOf(5, 10, 15, 30, 60)
+
+    fun volume(v: app.kairos.data.settings.ReminderVolume) = when (v) {
+        app.kairos.data.settings.ReminderVolume.LOUD -> "Yüksek (alarm ses düzeyi)"
+        app.kairos.data.settings.ReminderVolume.NORMAL -> "Normal (bildirim ses düzeyi)"
+    }
 }

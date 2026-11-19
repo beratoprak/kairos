@@ -1,5 +1,7 @@
 package app.kairos.ui.settings
 
+import app.kairos.speech.VoiceOption
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -65,6 +68,7 @@ private sealed interface Edit {
     data class Time(val title: String, val minute: Int, val apply: (AppSettings, Int) -> AppSettings) : Edit
     data class Choice<T>(val title: String, val options: List<Pair<String, T>>, val selected: T, val apply: (AppSettings, T) -> AppSettings) : Edit
     data object BriefDays : Edit
+    data object Voice : Edit
 }
 
 /**
@@ -87,6 +91,12 @@ fun SettingsScreen(
     reliabilityActions: ReliabilityActions = ReliabilityActions(),
     onExport: () -> Unit = {},
     onImport: () -> Unit = {},
+    onTestNotification: () -> Unit = {},
+    voices: List<VoiceOption>? = null,
+    onPreviewVoice: (voiceName: String?) -> Unit = {},
+    onInstallVoice: () -> Unit = {},
+    updateStatus: String? = null,
+    onCheckUpdate: () -> Unit = {},
 ) {
     val c = Kairos.colors
     val use24 = settings.appearance.use24Hour
@@ -173,7 +183,11 @@ fun SettingsScreen(
                         }
                     }
                     Divider()
-                    ValueRow("Ses", SettingsText.channel(b.channel)) {
+                    ValueRow("Konuşan ses", voices?.firstOrNull { it.name == b.voiceName }?.label ?: "Otomatik (en doğal ses)") { edit = Edit.Voice }
+                    Divider()
+                    ValueRow("Daha doğal ses indir", "Google konuşma motoru", onClick = onInstallVoice)
+                    Divider()
+                    ValueRow("Ses düzeyi", SettingsText.channel(b.channel)) {
                         edit = Edit.Choice("Hangi ses düzeyiyle okunsun?", AudioChannel.entries.map { SettingsText.channel(it) to it }, b.channel) { s, v ->
                             s.copy(brief = s.brief.copy(channel = v))
                         }
@@ -227,6 +241,14 @@ fun SettingsScreen(
         item("notifications") {
             val n = settings.notifications
             Section("Bildirimler") {
+                ValueRow("Hatırlatma sesi", SettingsText.volume(n.volume)) {
+                    edit = Edit.Choice(
+                        "Hatırlatma sesi",
+                        app.kairos.data.settings.ReminderVolume.entries.map { SettingsText.volume(it) to it },
+                        n.volume,
+                    ) { s, v -> s.copy(notifications = s.notifications.copy(volume = v)) }
+                }
+                Divider()
                 ValueRow("Erteleme süresi", TimeText.duration(n.snoozeMinutes)) {
                     edit = Edit.Choice("Erteleme süresi", SettingsText.snoozeOptions.map { TimeText.duration(it) to it }, n.snoozeMinutes) { s, v ->
                         s.copy(notifications = s.notifications.copy(snoozeMinutes = v))
@@ -248,6 +270,8 @@ fun SettingsScreen(
                 }
                 Divider()
                 ValueRow("Ses ve titreşim", "Android ayarları", onClick = onOpenSoundSettings)
+                Divider()
+                ValueRow("Deneme bildirimi", "1 dk sonra gönder", onClick = onTestNotification)
             }
         }
 
@@ -318,10 +342,22 @@ fun SettingsScreen(
             )
         }
 
+        // --- Güncellemeler ---
+        item("updates") {
+            Section("Güncellemeler") {
+                ValueRow("Sürüm", appVersion.ifEmpty { "—" }, onClick = null)
+                Divider()
+                ValueRow("Güncellemeleri denetle", updateStatus ?: "Denetle", onClick = onCheckUpdate)
+                Divider()
+                SwitchRow("Açılışta denetle", "Uygulama açılınca yeni sürüm olup olmadığına bakılır. Sadece sürüm bilgisi alınır.", settings.updates.checkOnLaunch) { on ->
+                    onUpdate { it.copy(updates = it.updates.copy(checkOnLaunch = on)) }
+                }
+            }
+        }
+
         // --- Hakkında ---
         item("about") {
             Section("Hakkında") {
-                ValueRow("Sürüm", appVersion.ifEmpty { "—" }, onClick = null)
                 Divider()
                 ValueRow("Lisans", "Açık kaynak · GPL-3.0", onClick = null)
             }
@@ -333,6 +369,12 @@ fun SettingsScreen(
     when (val e = edit) {
         is Edit.Time -> TimeDialog(e.minute, use24, onPick = { m -> onUpdate { e.apply(it, m) }; edit = null }, onDismiss = { edit = null })
         is Edit.Choice<*> -> ChoiceEdit(e, onUpdate) { edit = null }
+        Edit.Voice -> VoiceDialog(
+            voices = voices,
+            selected = settings.brief.voiceName,
+            onPick = { name -> onUpdate { it.copy(brief = it.brief.copy(voiceName = name)) }; onPreviewVoice(name) },
+            onDismiss = { edit = null },
+        )
         Edit.BriefDays -> DaysDialog(settings.brief.days, onPick = { d -> onUpdate { it.copy(brief = it.brief.copy(days = d)) }; edit = null }, onDismiss = { edit = null })
         null -> Unit
     }
@@ -357,20 +399,27 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
 @Composable
 private fun Divider() = Hairline(Modifier.padding(start = 16.dp))
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ValueRow(title: String, value: String, timeValue: Boolean = false, onClick: (() -> Unit)?) {
     val c = Kairos.colors
-    Row(
+    // Başlık ve değer yan yana sığmazsa değer alt satıra geçer; kelimeler bölünmez.
+    FlowRow(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = c.ink, modifier = Modifier.weight(1f))
-        Text(value, style = if (timeValue) TimeStyles.Value else MaterialTheme.typography.bodyMedium, color = if (timeValue) c.ink else c.inkMuted)
+        Text(title, style = MaterialTheme.typography.bodyLarge, color = c.ink, modifier = Modifier.padding(end = 12.dp))
+        Text(
+            value,
+            style = if (timeValue) TimeStyles.Value else MaterialTheme.typography.bodyMedium,
+            color = if (timeValue) c.ink else c.inkMuted,
+        )
     }
 }
 
@@ -449,5 +498,49 @@ private fun DaysDialog(initial: Set<Int>, onPick: (Set<Int>) -> Unit, onDismiss:
         },
         confirmButton = { TextButton(onClick = { onPick(days) }) { Text("Kaydet", color = c.ink) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Vazgeç", color = c.inkMuted) } },
+    )
+}
+
+/** Konuşan ses: dokunulan ses seçilir ve örnek cümle o sesle hemen okunur. */
+@Composable
+private fun VoiceDialog(voices: List<VoiceOption>?, selected: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
+    val c = Kairos.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surface,
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 0.dp,
+        title = { Text("Konuşan ses", style = MaterialTheme.typography.titleLarge, color = c.ink) },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Text("Bir sese dokunun; örnek cümle o sesle okunur.", style = MaterialTheme.typography.bodySmall, color = c.inkMuted)
+                Spacer(Modifier.height(8.dp))
+                val rows = listOf<Pair<String?, Pair<String, String>>>(null to ("Otomatik" to "Telefondaki en doğal Türkçe ses")) +
+                    voices.orEmpty().map { it.name to (it.label to it.detail) }
+                rows.forEachIndexed { i, (name, texts) ->
+                    if (i > 0) Hairline()
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp)
+                            .clickable(role = Role.RadioButton) { onPick(name) }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(texts.first, style = MaterialTheme.typography.bodyLarge, color = c.ink)
+                            Text(texts.second, style = MaterialTheme.typography.bodySmall, color = c.inkMuted)
+                        }
+                        if (name == selected) Icon(KairosIcons.Check, contentDescription = "Seçili", tint = c.accent, modifier = Modifier.size(18.dp))
+                    }
+                }
+                if (voices == null) Text("Sesler yükleniyor…", style = MaterialTheme.typography.bodySmall, color = c.inkMuted, modifier = Modifier.padding(top = 8.dp))
+                else if (voices.isEmpty()) Text(
+                    "Telefonda indirilmiş Türkçe ses bulunamadı. “Daha doğal ses indir” ile yükleyebilirsiniz.",
+                    style = MaterialTheme.typography.bodySmall, color = c.inkMuted, modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Tamam", color = c.ink) } },
     )
 }

@@ -12,3 +12,6 @@ captures/
 # Okuma amaçlı indirilen tam depolar (seçilen dosyalar kaynak/secilenler/ altında tutulur)
 /kaynak/reReminder/
 /kaynak/Remember/
+
+# Kullanıcıya verilen APK dosyaları
+/dist/

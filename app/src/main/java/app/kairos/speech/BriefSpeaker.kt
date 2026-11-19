@@ -30,7 +30,10 @@ class BriefSpeaker(context: Context) {
     private var focus: AudioFocusRequest? = null
     private var finished = false
 
-    fun speak(text: String, channel: AudioChannel, rate: Float, onFinished: (SpeakResult) -> Unit) {
+    /**
+     * @param voiceName kullanıcının Ayarlar'da seçtiği ses; null ise en kaliteli Türkçe ses seçilir.
+     */
+    fun speak(text: String, channel: AudioChannel, rate: Float, voiceName: String? = null, onFinished: (SpeakResult) -> Unit) {
         val finish = { result: SpeakResult ->
             main.post {
                 if (!finished) {
@@ -44,13 +47,16 @@ class BriefSpeaker(context: Context) {
         // Motor hiç yanıt vermezse bile en geç 30 sn'de kapan.
         main.postDelayed({ finish(SpeakResult.ENGINE_ERROR) }, 30_000L)
 
-        tts = TextToSpeech(context) { status ->
+        tts = TextToSpeech(context, { status ->
             val engine = tts
             if (status != TextToSpeech.SUCCESS || engine == null) return@TextToSpeech finish(SpeakResult.ENGINE_ERROR)
             val lang = engine.setLanguage(TimeText.TR)
             if (lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED) {
                 return@TextToSpeech finish(SpeakResult.NO_TURKISH_VOICE)
             }
+            // Robotik varsayılan yerine: seçilen ses ya da en kaliteli Türkçe ses.
+            VoiceCatalog.pick(engine, voiceName)?.let { runCatching { engine.voice = it } }
+            engine.setPitch(1.0f)
             val attrs = attributes(channel)
             engine.setAudioAttributes(attrs)
             engine.setSpeechRate(rate)
@@ -66,7 +72,7 @@ class BriefSpeaker(context: Context) {
             if (engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, UTTERANCE) != TextToSpeech.SUCCESS) {
                 finish(SpeakResult.ENGINE_ERROR)
             }
-        }
+        }, VoiceCatalog.preferredEngine(context))
     }
 
     private fun release() {

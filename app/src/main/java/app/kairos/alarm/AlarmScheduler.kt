@@ -36,6 +36,9 @@ class AlarmScheduler(
     /** Açılış, yeniden başlatma, saat/saat dilimi değişimi sonrası: tüm açık hatırlatmalar. */
     fun syncAll(open: List<Reminder>) = open.forEach(::onChanged)
 
+    /** Deneme bildirimi: gerçek hatırlatmayla aynı alarm yolundan [atMillis] anında gelir. */
+    fun scheduleTest(atMillis: Long) = set(PlannedAlarm(TEST_ID, AlarmKind.TEST, atMillis))
+
     fun canScheduleExact(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
 
@@ -55,7 +58,7 @@ class AlarmScheduler(
     }
 
     private fun cancel(reminderId: Long) {
-        AlarmKind.entries.forEach { kind -> alarmManager.cancel(pendingIntent(reminderId, kind, 0L)) }
+        listOf(AlarmKind.DUE, AlarmKind.LEAD).forEach { kind -> alarmManager.cancel(pendingIntent(reminderId, kind, 0L)) }
     }
 
     private fun pendingIntent(reminderId: Long, kind: AlarmKind, atMillis: Long): PendingIntent {
@@ -79,5 +82,7 @@ class AlarmScheduler(
         const val EXTRA_REMINDER_ID = "reminder_id"
         const val EXTRA_KIND = "kind"
         const val EXTRA_AT = "at"
+        /** Deneme bildirimi için hatırlatma kimliği (gerçek kimlikler 1'den başlar). */
+        const val TEST_ID = 0L
     }
 }

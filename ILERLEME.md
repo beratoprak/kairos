@@ -5,7 +5,8 @@ Her adım bitince buraya eklenir. En yeni kayıt en üstte.
 ## Şu anki durum
 - **Durum:** Sürüm 1 planındaki 10 adımın kodu tamamlandı. **Gerçek cihazda henüz hiç çalıştırılmadı.**
 - **Sıradaki:** gerçek cihaz/emülatör testi; ardından PLAN.md'deki "Sürüm 1 için kalan küçük işler"
-- **Release derlemesi:** `./gradlew assembleRelease` → `~/.kairos-build/app/outputs/apk/release/app-release-unsigned.apk` (imzasız, 2,1 MB)
+- **Kurulabilir APK:** `dist/Kairos-0.1.2.apk` (imzalı release, sürüm kodu 3; önceki sürümlerin üzerine kurulur). Bu sürümden sonrası uygulama içinden güncellenecek (GitHub Releases hazırlanınca). Yeniden üretmek: `./gradlew assembleRelease` → `~/.kairos-build/app/outputs/apk/release/app-release.apk`
+- **İmza anahtarı:** `~/.kairos-keys/` (anahtar + şifre dosyası, sadece kullanıcı okuyabilir). **Yedeklenmeli**; kaybolursa uygulama güncellenemez
 - **Geliştirme ortamı:** Java 17 (Temurin), Android SDK (platform 34/36, build-tools 34–36) `~/Library/Android/sdk`, Gradle 8.14.3 (wrapper), AGP 8.11.0, Kotlin 2.1.20, Compose BOM 2025.05.01
 - **Derleme komutu:** `./gradlew assembleDebug` → `~/.kairos-build/app/outputs/apk/debug/app-debug.apk`
 - **Derleme çıktıları iCloud dışında:** Masaüstü iCloud ile eşitlendiği için derleme klasörleri "dosya 2" çakışma kopyaları üretip derlemeyi bozuyordu. Çıktılar `~/.kairos-build/` altında (bkz. `build.gradle.kts`, `gradle.properties`). Test raporları: `~/.kairos-build/app/reports/tests/`
@@ -15,6 +16,60 @@ Her adım bitince buraya eklenir. En yeni kayıt en üstte.
 - **Cihaz:** Emülatör ve bağlı telefon yok. Henüz gerçek cihazda çalıştırılmadı.
 
 ---
+
+## 2026-11-19 — 0.1.2: Ses, doğal konuşma, uygulama içi güncelleme ✓
+**Test sonucu (0.1.1):** Samsung'da hatırlatma zamanında ve sesli geldi ✓. Xiaomi'de gelmedi (uygulama açılınca geldi) → Xiaomi kısıtı; Xiaomi adımlarının uygulanıp uygulanmadığı bilinmiyor.
+**İstekler:** bildirim sesi daha yüksek; sesli özetin robotik sesi yerine düzgün ses; her sürümde APK göndermek yerine uygulama içinde "Güncelle" düğmesi.
+
+**Yapılanlar**
+- Yüksek ses: yeni kanal `reminders_loud_v1` (ses alarm düzeyinden). Sadece telefon normal moddayken ve sessiz saatlerde değilken; titreşim/sessizde normal kanal. Ayarlar > Bildirimler > "Hatırlatma sesi": Yüksek (varsayılan) / Normal. Deneme bildirimi de aynı seçimi kullanır
+- Doğal ses: `speech/VoiceCatalog.kt` — Google konuşma motoru kuruluysa o; kurulu Türkçe sesler arasından en yüksek kaliteli (aynı kalitede cihazdaki ses önce). Ayarlar > Sesli özet > "Konuşan ses" (dokununca örnek okunur), "Daha doğal ses indir" (Google motoru yoksa Play Store, varsa ses verisi). Manifest'e Google motoru görünürlüğü eklendi
+- Uygulama içi güncelleme: `update/UpdateChecker` (GitHub Releases son sürüm, sürüm karşılaştırma, sadece https APK), `UpdateInstaller` (indirme + PackageInstaller oturumu + onay ekranı; imza Android tarafından denetlenir), `UpdateManager` (durum). Bugün'de "Yeni sürüm hazır · Güncelle / Sonra" şeridi; Ayarlar > Güncellemeler: sürüm, "Güncellemeleri denetle", "Açılışta denetle". Kurulum izni yoksa önce izin ekranı açılır. Depo: `BuildConfig.UPDATE_REPO = "beratoprak/kairos"` (henüz oluşturulmadı)
+- İzinler: INTERNET, REQUEST_INSTALL_PACKAGES
+- Deneme bildirimi ayarları artık ana iş parçacığını bekletmeden okunuyor
+
+**Doğrulama** — 139 test ✓, lint temiz ✓, imza aynı (v2+v3) ✓
+- `UpdateCheckerTest` (3), yüksek ses kanalı testi (alarm düzeyi; titreşimde/sessiz saatte normal kanal), varsayılanlar testi güncellendi
+
+**Açık**
+- GitHub deposu ve ilk sürüm yayını proje sahibinin onayını bekliyor (güncelleme düğmesi o zamana kadar "Güncel" der)
+- Xiaomi: test telefonunda adımlar uygulandı mı bilinmiyor; gerekirse "alarm saati modu" (setAlarmClock) önerilecek — KURALLAR §3.4 değişikliği, onay gerekir
+- Gerçek ses kalitesi ve güncelleme akışı cihazda denenmedi
+
+## 2026-11-19 — 0.1.1: Test kullanıcısı geri bildirimi ✓
+**Geri bildirim:** (1) yazı alanı daha büyük ve ortada olsun, saat üstte olsun, asla taşma olmasın; (2) 5 dk sonraya kurulan hatırlatmanın bildirimi hiç gelmiyor, sadece uygulamaya girilince ve sessiz geliyor.
+
+**Teşhis (2):** cihaz bilgisi henüz yok. En olası sebep: Android 14+'da "Alarmlar ve hatırlatıcılar" izni varsayılan KAPALI; izin yoksa uygulama yaklaşık zamanlı alarma geçiyor ve sistem bunu uygulama açılana kadar bekletebiliyor. İkinci olasılık: Xiaomi/Oppo/Vivo/Huawei'nin "otomatik başlatma" kısıtı ve dışarıdan yüklenen uygulamalarda sessiz kanal.
+
+**Yapılanlar**
+- Ekleme sayfası: Saat en üstte → Gün → ortada büyük (en az 3 satır, 120 dp) çok satırlı yazı alanı → seçenekler → düğmeler. Klavye kendiliğinden açılmıyor (saat görünür kalsın)
+- Taşma: büyük saat sığmazsa küçülür; gün/gün dilimi düğmeleri sığmazsa alt satıra geçer; sabit yükseklikler kaldırıldı; Bugün satırı dar ekranda saati başlığın üstüne alır; liste başlıkları artık "…" ile kesilmiyor; Ayarlar satırları ve izin satırları büyük yazıda alt alta diziliyor; tema seçici sarılıyor; alt menü çok büyük yazıda sadece ikon (ad ekran okuyucuya söylenir); saat cetveli rakamları sabit boyutta
+- Bildirim: yeni ses+titreşim tanımlı kanallar (`reminders_v2`, `lead_v2`, yüksek önem), eski kanallar silinir
+- Kayıttan sonra izin penceresi: bildirim ya da "Alarmlar ve hatırlatıcılar" kapalıysa nedenini anlatır ("İzni aç" / "Şimdi değil"), açılışta en fazla bir kez
+- Ayarlar > Bildirimler > **Deneme bildirimi**: 1 dk sonra, gerçek alarm yolu ve aynı kanal
+- Xiaomi, Oppo/Realme/OnePlus, Vivo, Huawei: "otomatik başlatma" ekranına doğrudan kısayol (yoksa rehber)
+- Uyarı şeridi metni düzeltildi ("birkaç dakika gecikebilir" → "geç gelebilir; uygulama kapalıyken hiç gelmeyebilir")
+
+**Doğrulama** — 134 test ✓, lint temiz ✓, imza aynı anahtar (v2+v3) ✓
+- `OverflowTest` (5): 320 dp + 2× yazıda Bugün, Yakında, Ayarlar, Ekle, İlk açılış; kısaltma, kelime bölünmesi, tek satır kesilmesi, sağdan taşma aranıyor
+- `ReminderFlowTest` +2: hatırlatma kanalı yüksek önemde, sesli, titreşimli, eski kanal silinmiş; deneme bildirimi gerçek alarm yolundan geliyor
+
+**Açık:** test kullanıcısının telefonu **Xiaomi** (proje sahibi bildirdi; model ve Android/HyperOS sürümü bilinmiyor). Xiaomi'de otomatik başlatma kapalı + yeni uygulamalarda kayan bildirim/ses kapalı gelmesi belirtiyle birebir uyuşuyor. Proje sahibine Xiaomi'ye özel kurulum adımları verildi; düzeltmenin cihazda işe yaradığı henüz doğrulanmadı.
+
+## 2026-11-19 — Simge ve kurulabilir APK ✓
+**Yapılanlar**
+- Proje sahibinin monokrom simgesi birebir alındı (ön plan, arka plan, tek renkli tema katmanı); bildirim çubuğu simgesi aynı işaretten
+- `IconMaskTest`: daire / yuvarlatılmış kare / kare maske, tema katmanı ve durum çubuğu önizlemesi → `app/screenshots/ikon_maskeler.png`
+- Yayın imzası: `~/.kairos-keys/kairos-release.p12` (RSA 4096, 30 yıl). Gradle anahtarı oradan okur; dosya yoksa release imzasız çıkar
+- Release: R8 kod küçültme + kaynak küçültme, v2 + v3 imza
+- `dist/Kairos-0.1.0.apk` (git dışı)
+
+**Doğrulama**
+- Temiz derleme: 127 test geçti ✓, lint hatası yok ✓
+- `apksigner verify`: v2 ve v3 imza geçerli ✓; `zipalign` uygun ✓; paket `app.kairos`, sürüm 0.1.0 (1), targetSdk 36 ✓
+- Not: proje sahibinin simge dosyasındaki işaret 46×46 birim; kendi tasarım belgesi "en az 48" diyor. Çizime dokunulmadı, proje sahibine bildirildi
+
+**Tasarım belgesi (`kairos-android-design-spec.md`):** proje sahibi sadece simge için verdiğini açıkladı. Belgeden yalnızca simge dosyaları kullanıldı; arayüz tasarımına hiçbir değişiklik yapılmadı ve yapılmayacak.
 
 ## 2026-11-19 — Karar uygulandı: veriler normal alanda
 **Proje sahibi kararları:** "ding" sesi yok, pil için tek dokunuşlu izin yok (kodda zaten yoktu), veriler normal alana taşınsın.

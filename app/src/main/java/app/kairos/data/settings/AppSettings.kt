@@ -15,7 +15,11 @@ data class AppSettings(
     val notifications: Notifications = Notifications(),
     val list: ListBehavior = ListBehavior(),
     val onboarding: Onboarding = Onboarding(),
+    val updates: Updates = Updates(),
 )
+
+/** Uygulama içi güncelleme. Proje sahibinin isteğiyle açılışta denetim varsayılan açık. */
+data class Updates(val checkOnLaunch: Boolean = true)
 
 /** Görünüm. */
 data class Appearance(
@@ -42,6 +46,8 @@ data class DailyBrief(
     val channel: AudioChannel = AudioChannel.NOTIFICATION,
     /** 0.5..2.0; 1.0 normal. */
     val speechRate: Float = 1.0f,
+    /** Konuşan ses (motorun ses adı); null = otomatik, en kaliteli Türkçe ses. */
+    val voiceName: String? = null,
 )
 
 enum class WhenNone { STAY_SILENT, SAY_NONE }
@@ -83,7 +89,14 @@ data class Notifications(
     val quietHoursEnabled: Boolean = false,
     val quietStartMinute: Int = 23 * 60,
     val quietEndMinute: Int = 7 * 60,
+    /**
+     * Hatırlatma sesinin düzeyi. LOUD: telefonun alarm ses düzeyinden çalar (genelde en yüksek);
+     * telefon sessiz/titreşimdeyken yine sessiz kalır. Proje sahibinin isteğiyle varsayılan LOUD.
+     */
+    val volume: ReminderVolume = ReminderVolume.LOUD,
 )
+
+enum class ReminderVolume { NORMAL, LOUD }
 
 /** Liste davranışı. */
 data class ListBehavior(

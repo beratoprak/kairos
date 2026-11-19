@@ -1,5 +1,10 @@
 package app.kairos.ui.settings
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +37,7 @@ import app.kairos.ui.theme.ThemeMode
  * Ayarlar > Görünüm > Tema. Her tema, açık ve koyu hâlini birlikte gösteren küçük bir
  * örnekle seçilir; altında Açık / Koyu / Telefonla aynı seçimi bulunur.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun ThemePicker(
     selectedFamily: ThemeFamily,
@@ -42,15 +48,17 @@ fun ThemePicker(
 ) {
     val c = Kairos.colors
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(
+        // Sığmazsa alt satıra geçer (dar ekran, büyük yazı boyutu); yatay taşma olmaz.
+        FlowRow(
             modifier = Modifier.fillMaxWidth().selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ThemeFamily.entries.forEach { family ->
                 val selected = family == selectedFamily
                 Column(
                     modifier = Modifier
-                        .weight(1f)
+                        .widthIn(min = 56.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .selectable(selected = selected, role = Role.RadioButton) { onFamily(family) }
                         .padding(vertical = 6.dp),
@@ -71,7 +79,7 @@ fun ThemePicker(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(44.dp)
+                .height(IntrinsicSize.Min)
                 .border(1.dp, c.line, RoundedCornerShape(10.dp))
                 .clip(RoundedCornerShape(10.dp))
                 .selectableGroup(),
@@ -81,13 +89,16 @@ fun ThemePicker(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp)
+                        .fillMaxHeight()
+                        .heightIn(min = 44.dp)
                         .background(if (selected) c.primary else Color.Transparent)
-                        .selectable(selected = selected, role = Role.RadioButton) { onMode(mode) },
+                        .selectable(selected = selected, role = Role.RadioButton) { onMode(mode) }
+                        .padding(horizontal = 4.dp, vertical = 10.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = mode.displayName,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         style = MaterialTheme.typography.labelMedium,
                         color = if (selected) c.onPrimary else c.ink,
                     )

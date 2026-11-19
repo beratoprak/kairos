@@ -28,8 +28,15 @@ import java.time.LocalDate
  * gruplardır; uygulama hiçbirini zorla açmaz.
  */
 object Notifications {
-    const val CHANNEL_REMINDERS = "reminders"
-    const val CHANNEL_LEAD = "lead"
+    /**
+     * Kanal ayarları (ses, titreşim) ilk oluşturulduktan sonra uygulama tarafından değiştirilemez.
+     * Ses ve titreşimi açıkça tanımlanmış kanallar yeni kimlikle (`_v2`) oluşturulur; eskiler silinir.
+     */
+    const val CHANNEL_REMINDERS = "reminders_v2"
+    const val CHANNEL_LEAD = "lead_v2"
+    /** Aynı hatırlatma, alarm ses düzeyinden (yüksek). Kanal sesi sonradan değiştirilemediği için ayrı kanal. */
+    const val CHANNEL_REMINDERS_LOUD = "reminders_loud_v1"
+    private val OLD_CHANNELS = listOf("reminders", "lead")
     const val CHANNEL_MISSED = "missed"
     const val CHANNEL_BRIEF = "brief"
     const val CHANNEL_BRIEF_SPEAKING = "brief_speaking"
@@ -37,17 +44,43 @@ object Notifications {
     /** Hatırlatma kimlikleriyle çakışmasın diye negatif. */
     const val ID_BRIEF = -1
     const val ID_BRIEF_SPEAKING = -2
+    const val ID_TEST = -3
 
     fun createChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
+        OLD_CHANNELS.forEach { runCatching { manager.deleteNotificationChannel(it) } }
+        val sound = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+        val soundAttrs = android.media.AudioAttributes.Builder()
+            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
         manager.createNotificationChannels(
             listOf(
                 NotificationChannel(CHANNEL_REMINDERS, "Hatırlatmalar", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Kurduğunuz hatırlatmalar, zamanı geldiğinde."
+                    description = "Kurduğunuz hatırlatmalar, zamanı geldiğinde. Sesli ve titreşimli."
+                    setSound(sound, soundAttrs)
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 250, 150, 250)
+                    enableLights(true)
                 },
-                NotificationChannel(CHANNEL_LEAD, "Önceden hatırlatmalar", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                NotificationChannel(CHANNEL_REMINDERS_LOUD, "Hatırlatmalar (yüksek ses)", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Hatırlatma sesi telefonun alarm ses düzeyinden çalar. Telefon sessizdeyken kullanılmaz."
+                    setSound(
+                        sound,
+                        android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build(),
+                    )
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 250, 150, 250)
+                    enableLights(true)
+                },
+                NotificationChannel(CHANNEL_LEAD, "Önceden hatırlatmalar", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Bir hatırlatmadan önce istediğiniz ek bildirim."
+                    setSound(sound, soundAttrs)
+                    enableVibration(true)
                 },
                 NotificationChannel(CHANNEL_MISSED, "Kaçırılanlar", NotificationManager.IMPORTANCE_LOW).apply {
                     description = "Telefon kapalıyken zamanı geçen hatırlatmalar. Ses çıkarmaz."
@@ -91,13 +124,13 @@ object Notifications {
             Style.LEAD -> "${TimeText.duration(reminder.leadMinutes ?: 0)} sonra · ${TimeText.time(reminder.dueMinute, use24)}"
             Style.MISSED -> "Kaçırıldı · $whenText"
         }
+        val snooze = settings.notifications.snoozeMinutes
+        val quiet = settings.notifications.let { n -> n.quietHoursEnabled && inWindow(nowMinute, n.quietStartMinute, n.quietEndMinute) }
         val channel = when (style) {
-            Style.DUE -> CHANNEL_REMINDERS
+            Style.DUE -> reminderChannel(context, settings, quiet)
             Style.LEAD -> CHANNEL_LEAD
             Style.MISSED -> CHANNEL_MISSED
         }
-        val snooze = settings.notifications.snoozeMinutes
-        val quiet = settings.notifications.let { n -> n.quietHoursEnabled && inWindow(nowMinute, n.quietStartMinute, n.quietEndMinute) }
 
         val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification)
@@ -120,6 +153,24 @@ object Notifications {
             NotificationManagerCompat.from(context).notify(notificationId(reminder.id), builder.build())
         } catch (_: SecurityException) {
             // İzin tam bu sırada geri alındıysa sessizce geç; hatırlatma listede gecikmiş görünür.
+        }
+    }
+
+    /** Ayarlar > "Deneme bildirimi": hatırlatmayla aynı kanal ve aynı alarm yolu. */
+    fun showTest(context: Context, settings: AppSettings) {
+        if (!canPost(context)) return
+        val builder = NotificationCompat.Builder(context, reminderChannel(context, settings, quiet = false))
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Deneme bildirimi")
+            .setContentText("Bu bildirim zamanında ve sesli geldiyse hatırlatmalarınız da öyle gelecek.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Bu bildirim zamanında ve sesli geldiyse hatırlatmalarınız da öyle gelecek."))
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(openApp(context, 0))
+        try {
+            NotificationManagerCompat.from(context).notify(ID_TEST, builder.build())
+        } catch (_: SecurityException) {
         }
     }
 
@@ -152,6 +203,16 @@ object Notifications {
         .setSilent(true)
         .setOngoing(true)
         .build()
+
+    /**
+     * Yüksek ses yalnızca kullanıcı seçtiyse, telefon normal (zil açık) moddaysa ve sessiz saatlerde
+     * değilse kullanılır. Telefon sessiz/titreşimdeyse normal kanal: telefonun kendi kuralı geçerli.
+     */
+    fun reminderChannel(context: Context, settings: AppSettings, quiet: Boolean): String {
+        val ringerNormal = context.getSystemService(android.media.AudioManager::class.java)?.ringerMode == android.media.AudioManager.RINGER_MODE_NORMAL
+        val loud = settings.notifications.volume == app.kairos.data.settings.ReminderVolume.LOUD && ringerNormal && !quiet
+        return if (loud) CHANNEL_REMINDERS_LOUD else CHANNEL_REMINDERS
+    }
 
     fun cancel(context: Context, reminderId: Long) =
         NotificationManagerCompat.from(context).cancel(notificationId(reminderId))

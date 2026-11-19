@@ -1,6 +1,14 @@
 package app.kairos.ui.editor
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -94,11 +102,12 @@ fun EditorSheet(
         tonalElevation = 0.dp,
         dragHandle = { Box(Modifier.padding(top = 10.dp, bottom = 6.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(c.line)) },
     ) {
-        EditorContent(draft, settings, now, onChange, onSave, onDelete, onDismiss, autoFocus = draft.isNew)
+        // Klavye kendiliğinden açılmaz: üstteki saat bölümü görünür kalsın; yazı alanına dokununca açılır.
+        EditorContent(draft, settings, now, onChange, onSave, onDelete, onDismiss, autoFocus = false)
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditorContent(
     draft: EditorDraft,
@@ -125,62 +134,34 @@ fun EditorContent(
             .padding(start = 20.dp, end = 20.dp, bottom = 22.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        // --- Metin ---
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Label("Ne hatırlatılsın?")
-            BasicTextField(
-                value = draft.title,
-                onValueChange = { onChange(draft.copy(title = it)) },
-                textStyle = MaterialTheme.typography.titleLarge.copy(color = c.ink),
-                cursorBrush = SolidColor(c.accent),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { if (draft.canSave) onSave() }),
-                modifier = Modifier.fillMaxWidth().focusRequester(focus).semantics { contentDescription = "Hatırlatma metni" },
-                decorationBox = { inner ->
-                    Column {
-                        Box(Modifier.padding(vertical = 8.dp)) {
-                            if (draft.title.isEmpty()) Text("Örneğin: Sözleşmeyi hukuka ilet", style = MaterialTheme.typography.titleLarge, color = c.inkFaint)
-                            inner()
-                        }
-                        Hairline(color = c.ink, thickness = 1.5.dp)
-                    }
-                },
-            )
-        }
-
-        // --- Gün ---
+        // --- Saat (en üstte) ---
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Label("Gün")
-            val chips = EditorLogic.dayChips(today)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                chips.forEach { chip ->
-                    Chip(chip.label, selected = draft.date == chip.date) { onChange(EditorLogic.withDate(draft, chip.date, now, settings)) }
-                }
-                val other = chips.none { it.date == draft.date }
-                Chip(if (other) TimeText.day(draft.date, today) else "Tarih", selected = other, icon = true) { picker = Picker.DATE }
-            }
-        }
-
-        // --- Saat ---
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Label("Saat")
                 if (draft.fromLastUsed) Text("Son seçtiğiniz saat", style = MaterialTheme.typography.bodySmall, color = c.inkMuted)
             }
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                // Büyük saat ekrana sığmazsa (dar ekran, büyük yazı boyutu) taşmak yerine küçülür.
+                BasicText(
                     TimeText.time(draft.minute, use24),
-                    style = TimeStyles.Display,
-                    color = c.ink,
+                    style = TimeStyles.Display.copy(color = c.ink),
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 36.sp, maxFontSize = TimeStyles.Display.fontSize),
                     modifier = Modifier
+                        .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .clickable(role = Role.Button, onClickLabel = "Saati yazarak seç") { picker = Picker.TIME },
                 )
-                Text(EditorLogic.longDate(draft.date), style = MaterialTheme.typography.bodyMedium, color = c.inkMuted, modifier = Modifier.padding(bottom = 10.dp))
+                Text(EditorLogic.longDate(draft.date), style = MaterialTheme.typography.bodyMedium, color = c.inkMuted)
             }
             TimeRuler(draft.minute, { onChange(EditorLogic.withMinute(draft, it)) }, use24)
             val parts = settings.newReminder.dayParts
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = 3,
+            ) {
                 listOf("Sabah" to parts.morning, "Öğle" to parts.noon, "Akşam" to parts.evening).forEach { (name, m) ->
                     Chip("$name ${TimeText.time(m, use24)}", selected = draft.minute == m, modifier = Modifier.weight(1f)) {
                         onChange(EditorLogic.withMinute(draft, m))
@@ -190,6 +171,57 @@ fun EditorContent(
             if (EditorLogic.isInPast(draft, now)) {
                 Text("Bu zaman geçti. Kaydederseniz gecikmiş olarak görünür.", style = MaterialTheme.typography.bodySmall, color = c.overdue)
             }
+        }
+
+        // --- Gün ---
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Label("Gün")
+            val chips = EditorLogic.dayChips(today)
+            // Sığmayan düğme alt satıra geçer; yatay taşma olmaz.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                chips.forEach { chip ->
+                    Chip(chip.label, selected = draft.date == chip.date) { onChange(EditorLogic.withDate(draft, chip.date, now, settings)) }
+                }
+                val other = chips.none { it.date == draft.date }
+                Chip(if (other) TimeText.day(draft.date, today) else "Tarih", selected = other, icon = true) { picker = Picker.DATE }
+            }
+        }
+
+        // --- Metin (ortada, büyük alan) ---
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Label("Ne hatırlatılsın?")
+            var focused by remember { mutableStateOf(false) }
+            val shape = RoundedCornerShape(12.dp)
+            BasicTextField(
+                value = draft.title,
+                onValueChange = { onChange(draft.copy(title = it)) },
+                textStyle = MaterialTheme.typography.titleLarge.copy(color = c.ink),
+                cursorBrush = SolidColor(c.accent),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (draft.canSave) onSave() }),
+                // Çok satırlı: uzun metin alt satıra geçer ve alan büyür; kesilmez.
+                singleLine = false,
+                minLines = 3,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focus)
+                    .onFocusChanged { focused = it.isFocused }
+                    .semantics { contentDescription = "Hatırlatma metni" },
+                decorationBox = { inner ->
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp)
+                            .clip(shape)
+                            .background(c.ground)
+                            .border(if (focused) 1.5.dp else 1.dp, if (focused) c.ink else c.line, shape)
+                            .padding(16.dp),
+                    ) {
+                        if (draft.title.isEmpty()) Text("Örneğin: Sözleşmeyi hukuka ilet", style = MaterialTheme.typography.titleLarge, color = c.inkFaint)
+                        inner()
+                    }
+                },
+            )
         }
 
         // --- Seçenekler (hepsi varsayılan kapalı) ---
@@ -204,7 +236,7 @@ fun EditorContent(
         }
 
         // --- Düğmeler ---
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             if (draft.isNew) {
                 SecondaryButton("Vazgeç", onCancel)
             } else {
@@ -213,13 +245,14 @@ fun EditorContent(
             Box(
                 Modifier
                     .weight(1f)
-                    .height(52.dp)
+                    .heightIn(min = 52.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (draft.canSave) c.primary else c.line)
-                    .clickable(enabled = draft.canSave, role = Role.Button, onClick = onSave),
+                    .clickable(enabled = draft.canSave, role = Role.Button, onClick = onSave)
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Kaydet", style = MaterialTheme.typography.labelLarge, color = if (draft.canSave) c.onPrimary else c.inkMuted)
+                Text("Kaydet", style = MaterialTheme.typography.labelLarge, color = if (draft.canSave) c.onPrimary else c.inkMuted, textAlign = TextAlign.Center)
             }
         }
     }
@@ -251,17 +284,17 @@ private fun Chip(text: String, selected: Boolean, modifier: Modifier = Modifier,
     val shape = RoundedCornerShape(10.dp)
     Row(
         modifier
-            .height(40.dp)
+            .heightIn(min = 44.dp)
             .clip(shape)
             .background(if (selected) c.primary else Color.Transparent)
             .border(1.dp, if (selected) c.primary else c.line, shape)
             .clickable(role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon) Icon(KairosIcons.Upcoming, contentDescription = null, tint = if (selected) c.onPrimary else c.ink, modifier = Modifier.size(15.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = if (selected) c.onPrimary else c.ink, maxLines = 1)
+        Text(text, style = MaterialTheme.typography.labelMedium, color = if (selected) c.onPrimary else c.ink, textAlign = TextAlign.Center)
     }
 }
 
@@ -269,12 +302,12 @@ private fun Chip(text: String, selected: Boolean, modifier: Modifier = Modifier,
 private fun OptionRow(label: String, value: String, onClick: () -> Unit) {
     val c = Kairos.colors
     Row(
-        Modifier.fillMaxWidth().height(52.dp).clickable(role = Role.Button, onClick = onClick),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(role = Role.Button, onClick = onClick).padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = c.ink)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = c.inkMuted)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = c.ink, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = c.inkMuted, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
     }
 }
 
@@ -283,11 +316,11 @@ private fun SecondaryButton(text: String, onClick: () -> Unit, color: Color = Ka
     val c = Kairos.colors
     Box(
         Modifier
-            .height(52.dp)
+            .heightIn(min = 52.dp)
             .clip(RoundedCornerShape(12.dp))
             .border(1.dp, c.line, RoundedCornerShape(12.dp))
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, style = MaterialTheme.typography.labelLarge, color = color) }
 }
@@ -307,11 +340,11 @@ internal fun <T> ChoiceDialog(title: String, options: List<Pair<String, T>>, sel
                 options.forEachIndexed { i, (label, value) ->
                     if (i > 0) Hairline()
                     Row(
-                        Modifier.fillMaxWidth().height(48.dp).clickable(role = Role.RadioButton) { onPick(value) },
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.RadioButton) { onPick(value) }.padding(vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(label, style = MaterialTheme.typography.bodyLarge, color = c.ink)
+                        Text(label, style = MaterialTheme.typography.bodyLarge, color = c.ink, modifier = Modifier.weight(1f))
                         if (value == selected) Icon(KairosIcons.Check, contentDescription = "Seçili", tint = c.accent, modifier = Modifier.size(18.dp))
                     }
                 }

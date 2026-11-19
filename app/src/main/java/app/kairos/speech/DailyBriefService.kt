@@ -35,9 +35,10 @@ class DailyBriefService : Service() {
         }
         val channel = runCatching { AudioChannel.valueOf(intent.getStringExtra(EXTRA_CHANNEL).orEmpty()) }.getOrDefault(AudioChannel.NOTIFICATION)
         val rate = intent.getFloatExtra(EXTRA_RATE, 1.0f)
+        val voice = intent.getStringExtra(EXTRA_VOICE)
 
         speaker = BriefSpeaker(this).also { s ->
-            s.speak(text, channel, rate) { result ->
+            s.speak(text, channel, rate, voice) { result ->
                 // Türkçe ses yoksa ya da motor çalışmadıysa: söylenemeyen cümle bildirim olarak kalır.
                 if (result != SpeakResult.DONE) Notifications.showBrief(this, text, missingVoice = result == SpeakResult.NO_TURKISH_VOICE)
                 stop()
@@ -56,13 +57,15 @@ class DailyBriefService : Service() {
         private const val EXTRA_TEXT = "text"
         private const val EXTRA_CHANNEL = "channel"
         private const val EXTRA_RATE = "rate"
+        private const val EXTRA_VOICE = "voice"
 
         /** @return başlatılamadıysa false (çağıran bildirime geri döner). */
-        fun start(context: Context, text: String, channel: AudioChannel, rate: Float): Boolean {
+        fun start(context: Context, text: String, channel: AudioChannel, rate: Float, voiceName: String? = null): Boolean {
             val intent = Intent(context, DailyBriefService::class.java)
                 .putExtra(EXTRA_TEXT, text)
                 .putExtra(EXTRA_CHANNEL, channel.name)
                 .putExtra(EXTRA_RATE, rate)
+                .putExtra(EXTRA_VOICE, voiceName)
             return runCatching { ContextCompat.startForegroundService(context, intent) }
                 .onFailure { Log.w(TAG, "Özet servisi başlatılamadı", it) }
                 .isSuccess

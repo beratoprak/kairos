@@ -8,6 +8,9 @@ import android.content.Intent
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import app.kairos.KairosApp
+import app.kairos.data.settings.AppSettings
+import app.kairos.data.settings.ReminderVolume
+import app.kairos.notification.Notifications
 import app.kairos.data.Reminder
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -96,6 +99,44 @@ class ReminderFlowTest {
         Thread.sleep(300)
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue(notifications.allNotifications.isEmpty())
+    }
+
+    /** Hatırlatma kanalı sesli, titreşimli ve yüksek önemde; eski (sessiz kalmış olabilecek) kanallar silinmiş. */
+    @Test fun reminderChannelMakesSound() {
+        val nm = app.getSystemService(NotificationManager::class.java)
+        val channel = nm.getNotificationChannel(Notifications.CHANNEL_REMINDERS)
+        assertNotNull(channel)
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, channel.importance)
+        assertNotNull("ses tanımlı olmalı", channel.sound)
+        assertTrue("titreşim açık olmalı", channel.shouldVibrate())
+        assertEquals(null, nm.getNotificationChannel("reminders"))
+    }
+
+    /** Yüksek ses: alarm ses düzeyinden çalar; telefon titreşimdeyken normal kanal (telefonun kuralı geçerli). */
+    @Test fun loudChannelUsesAlarmVolumeButRespectsSilentPhone() {
+        val nm = app.getSystemService(NotificationManager::class.java)
+        val loud = nm.getNotificationChannel(Notifications.CHANNEL_REMINDERS_LOUD)
+        assertEquals(android.media.AudioAttributes.USAGE_ALARM, loud.audioAttributes.usage)
+        val s = AppSettings()
+        val audio = app.getSystemService(android.media.AudioManager::class.java)
+        audio.ringerMode = android.media.AudioManager.RINGER_MODE_NORMAL
+        assertEquals(Notifications.CHANNEL_REMINDERS_LOUD, Notifications.reminderChannel(app, s, quiet = false))
+        assertEquals("sessiz saatlerde yüksek ses yok", Notifications.CHANNEL_REMINDERS, Notifications.reminderChannel(app, s, quiet = true))
+        audio.ringerMode = android.media.AudioManager.RINGER_MODE_VIBRATE
+        assertEquals(Notifications.CHANNEL_REMINDERS, Notifications.reminderChannel(app, s, quiet = false))
+        val normal = s.copy(notifications = s.notifications.copy(volume = ReminderVolume.NORMAL))
+        audio.ringerMode = android.media.AudioManager.RINGER_MODE_NORMAL
+        assertEquals(Notifications.CHANNEL_REMINDERS, Notifications.reminderChannel(app, normal, quiet = false))
+    }
+
+    /** Ayarlar > Deneme bildirimi: gerçek hatırlatmayla aynı alarm yolu ve aynı sesli kanal. */
+    @Test fun testNotificationUsesTheRealAlarmPath() {
+        graph.scheduler.scheduleTest(graph.clock.millis() + 60_000L)
+        val alarm = alarms.scheduledAlarms.single()
+        assertEquals(AlarmManager.RTC_WAKEUP, alarm.type)
+        app.sendBroadcast(Intent(shadowOf(alarm.operation).savedIntent))
+        waitUntil("deneme bildirimi") { notifications.allNotifications.any { shadowOf(it).contentTitle == "Deneme bildirimi" } }
+        assertEquals(Notifications.CHANNEL_REMINDERS_LOUD, notifications.allNotifications.single().channelId)
     }
 
     /** Telefon kapalı/kilitliyken zamanı geçen hatırlatma, kilit açılınca bir kez ve sessizce bildirilir. */

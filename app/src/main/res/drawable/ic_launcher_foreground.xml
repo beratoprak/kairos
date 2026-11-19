@@ -1,18 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Kadran cetveli: saat başı ve çeyrek bölmeleri, ortada pirinç ibre. Düz renk, gradyan yok. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Bölmeler -->
-    <path android:fillColor="#F3F4EF" android:pathData="M33,42h2v24h-2z" />
-    <path android:fillColor="#F3F4EF" android:pathData="M41,46h1.5v12h-1.5z" />
-    <path android:fillColor="#F3F4EF" android:pathData="M48,44h1.5v16h-1.5z" />
-    <path android:fillColor="#F3F4EF" android:pathData="M58.5,44h1.5v16h-1.5z" />
-    <path android:fillColor="#F3F4EF" android:pathData="M65.5,46h1.5v12h-1.5z" />
-    <path android:fillColor="#F3F4EF" android:pathData="M73,42h2v24h-2z" />
-    <!-- Pirinç ibre -->
-    <path android:fillColor="#C9A35E" android:pathData="M52.5,34h3v40h-3z" />
-    <path android:fillColor="#C9A35E" android:pathData="M49,32h10l-5,6z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M31,31h20v7h-13v6l7,7h-14zM57,31h20v20h-14l7,-7v-6h-13zM31,57h14l-7,7v6h13v7h-20zM57,70h13v-6l-7,-7h14v20h-20z" />
 </vector>

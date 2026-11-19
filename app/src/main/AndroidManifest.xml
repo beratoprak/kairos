@@ -13,12 +13,18 @@
     <!-- Günlük sesli özet birkaç saniyelik ön plan servisinde okunur (Android arka plan sesini kısabilir). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+    <!-- Sadece uygulama içi güncelleme: yeni sürüm denetimi ve indirme (KURALLAR §3.7 istisnası). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- İndirilen güncellemeyi kurmak için; Android kullanıcıdan bir kez izin ister. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Android 11+: telefondaki metin okuma (TTS) motorunu görebilmek için. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
+        <!-- Daha doğal ses: Google konuşma motoru kurulu mu? -->
+        <package android:name="com.google.android.tts" />
     </queries>
 
     <application
@@ -58,6 +64,11 @@
             android:name=".speech.DailyBriefService"
             android:exported="false"
             android:foregroundServiceType="systemExempted" />
+
+        <!-- Güncelleme kurulumunun sonucu (onay ekranı, hata). -->
+        <receiver
+            android:name=".update.UpdateInstaller$UpdateStatusReceiver"
+            android:exported="false" />
 
         <!-- Sistem yayınlarını alabilmesi için dışa açık olmak zorunda. Telefon yeniden başladığında,
              kullanıcı kilidi ilk kez açınca çalışır (veriler normal, şifreyle korunan alanda). -->

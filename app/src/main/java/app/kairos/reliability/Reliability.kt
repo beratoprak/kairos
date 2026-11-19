@@ -128,6 +128,34 @@ object Reliability {
 
     fun guideIntent(status: ReliabilityStatus) = Intent(Intent.ACTION_VIEW, Uri.parse(status.guideUrl))
 
+    /**
+     * Uygulamaları arka planda durduran üreticilerin "otomatik başlatma" ekranları. Bu izin
+     * kapalıyken uygulama kapalıyken alarm gelmez, ancak uygulama açılınca gelir. Ekran adları
+     * sürümden sürüme değiştiği için birkaç yol denenir; hiçbiri yoksa rehber açılır.
+     */
+    fun autostartIntents(vendor: DkmaVendor?): List<Intent> {
+        fun c(pkg: String, cls: String) = Intent().setComponent(android.content.ComponentName(pkg, cls))
+        return when (vendor) {
+            DkmaVendor.XIAOMI -> listOf(
+                c("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+            )
+            DkmaVendor.OPPO, DkmaVendor.REALME, DkmaVendor.ONEPLUS -> listOf(
+                c("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
+                c("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"),
+                c("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"),
+            )
+            DkmaVendor.VIVO -> listOf(
+                c("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
+                c("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"),
+            )
+            DkmaVendor.HUAWEI -> listOf(
+                c("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+                c("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"),
+            )
+            else -> emptyList()
+        }
+    }
+
     /** Cihazın açabildiği ilk ekranı açar. Üreticiler bu ekranları sık kaldırdığından tek denemeye güvenilmez. */
     fun startFirstAvailable(context: Context, intents: List<Intent>): Boolean {
         for (intent in intents) {

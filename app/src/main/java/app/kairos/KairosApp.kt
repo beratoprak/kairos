@@ -1,5 +1,6 @@
 package app.kairos
 
+import app.kairos.update.UpdateManager
 import android.app.Application
 import android.content.Context
 import app.kairos.alarm.AlarmScheduler
@@ -26,6 +27,7 @@ class AppGraph(context: Context) {
     val scheduler = AlarmScheduler(app, clock)
     val repository = ReminderRepository(database.reminders(), clock, scheduler)
     val briefScheduler = BriefScheduler(app, clock)
+    val updates = UpdateManager(app, scope, BuildConfig.UPDATE_REPO, BuildConfig.VERSION_NAME)
 }
 
 class KairosApp : Application() {

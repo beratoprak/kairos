@@ -1,5 +1,8 @@
 package app.kairos.ui.home
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.BasicText
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -129,6 +132,8 @@ fun HomeScreen(
 @Composable
 private fun BottomNav(selected: HomeTab, onTab: (HomeTab) -> Unit) {
     val c = Kairos.colors
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    val iconsOnly = config.fontScale > 1.5f && config.screenWidthDp < 400
     Column {
         Hairline()
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp).selectableGroup()) {
@@ -148,12 +153,20 @@ private fun BottomNav(selected: HomeTab, onTab: (HomeTab) -> Unit) {
                         HomeTab.COMPLETED -> KairosIcons.Check
                         HomeTab.SETTINGS -> KairosIcons.Settings
                     }
-                    Icon(icon, contentDescription = null, tint = if (on) c.ink else c.inkMuted, modifier = Modifier.size(22.dp))
-                    Text(
+                    // Çok büyük yazı boyutunda ve dar ekranda sekme adları sığmaz: sadece ikon gösterilir,
+                    // ad ekran okuyucuya söylenir. Yazı kesilmez, bölünmez.
+                    Icon(icon, contentDescription = if (iconsOnly) t.title else null, tint = if (on) c.ink else c.inkMuted, modifier = Modifier.size(22.dp))
+                    if (!iconsOnly) BasicText(
                         t.title,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (on) c.ink else c.inkMuted,
+                        maxLines = 1,
+                        softWrap = false,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = MaterialTheme.typography.labelSmall.fontSize),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
+                            color = if (on) c.ink else c.inkMuted,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Box(Modifier.width(18.dp).height(2.dp).background(if (on) c.accent else c.ground))
                 }
@@ -188,8 +201,8 @@ fun SnoozeSheet(options: List<SnoozePreset>, onPick: (SnoozePreset) -> Unit, onD
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(o.title, style = MaterialTheme.typography.bodyLarge, color = c.ink)
-                    Text(o.detail, style = MaterialTheme.typography.bodyMedium, color = c.inkMuted)
+                    Text(o.title, style = MaterialTheme.typography.bodyLarge, color = c.ink, modifier = Modifier.weight(1f))
+                    Text(o.detail, style = MaterialTheme.typography.bodyMedium, color = c.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.End)
                 }
             }
         }
@@ -202,6 +215,7 @@ fun HomeRoute(
     vm: HomeViewModel,
     settingsContent: @Composable (PaddingValues) -> Unit,
     banner: (@Composable () -> Unit)? = null,
+    onSaved: () -> Unit = {},
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val appSettings by vm.appSettings.collectAsStateWithLifecycle()
@@ -255,7 +269,7 @@ fun HomeRoute(
             settings = s,
             now = vm.now(),
             onChange = { draft = it },
-            onSave = { vm.save(d); draft = null },
+            onSave = { vm.save(d); draft = null; onSaved() },
             onDelete = { vm.delete(d.id); draft = null },
             onDismiss = { draft = null },
         )

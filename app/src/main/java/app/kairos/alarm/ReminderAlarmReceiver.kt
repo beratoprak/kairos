@@ -20,10 +20,21 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         val id = intent.getLongExtra(AlarmScheduler.EXTRA_REMINDER_ID, -1L)
         val kind = runCatching { AlarmKind.valueOf(intent.getStringExtra(AlarmScheduler.EXTRA_KIND).orEmpty()) }.getOrNull()
         val at = intent.getLongExtra(AlarmScheduler.EXTRA_AT, 0L)
-        if (id <= 0L || kind == null) return
+        if (kind == null) return
+        if (kind != AlarmKind.TEST && id <= 0L) return
 
         val graph = KairosApp.graph(context)
         val pending = goAsync()
+        if (kind == AlarmKind.TEST) {
+            graph.scope.launch {
+                try {
+                    Notifications.showTest(context, graph.settings.current())
+                } finally {
+                    pending.finish()
+                }
+            }
+            return
+        }
         val wakeLock = context.getSystemService(PowerManager::class.java)
             ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kairos:reminder")
             ?.apply { acquire(10_000L) }

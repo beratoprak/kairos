@@ -2,6 +2,7 @@
 // (a963087) projesindeki ui/setup/SetupScreen.kt dosyasından esinlenmiştir. Orijinal: GPL-3.0
 package app.kairos.ui.onboarding
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -118,13 +119,14 @@ private fun Choice(text: String, selected: Boolean, modifier: Modifier, onClick:
     val shape = RoundedCornerShape(10.dp)
     Box(
         modifier
-            .height(48.dp)
+            .heightIn(min = 48.dp)
             .clip(shape)
             .background(if (selected) c.primary else Color.Transparent)
             .border(1.dp, if (selected) c.primary else c.line, shape)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, color = if (selected) c.onPrimary else c.ink)
+        Text(text, style = MaterialTheme.typography.labelLarge, color = if (selected) c.onPrimary else c.ink, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }

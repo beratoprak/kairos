@@ -36,7 +36,7 @@ class BriefReceiver : BroadcastReceiver() {
                     brief = brief,
                 )
                 when (BriefPlanner.decide(sentence, isPhoneSilent(context), brief.whenSilentMode)) {
-                    BriefAction.SPEAK -> if (!DailyBriefService.start(context, sentence!!, brief.channel, brief.speechRate)) {
+                    BriefAction.SPEAK -> if (!DailyBriefService.start(context, sentence!!, brief.channel, brief.speechRate, brief.voiceName)) {
                         Notifications.showBrief(context, sentence)
                     }
                     BriefAction.NOTIFY -> Notifications.showBrief(context, sentence!!)

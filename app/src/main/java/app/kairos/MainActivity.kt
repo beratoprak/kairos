@@ -1,5 +1,15 @@
 package app.kairos
 
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.height
+import app.kairos.update.updateStatusText
+import app.kairos.update.UpdateState
+import app.kairos.update.UpdateInstaller
+import app.kairos.update.UpdateBanner
+import androidx.compose.runtime.setValue
+import app.kairos.speech.BriefText
+import app.kairos.speech.VoiceOption
+import app.kairos.speech.VoiceCatalog
 import android.Manifest
 import android.content.Intent
 import android.graphics.Color as AndroidColor
@@ -16,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -31,6 +42,7 @@ import kotlinx.coroutines.withContext
 import app.kairos.reliability.Reliability
 import app.kairos.reliability.ReliabilityActions
 import app.kairos.reliability.ReliabilityBanner
+import app.kairos.reliability.PermissionPrompt
 import app.kairos.reliability.ReliabilityStatus
 import app.kairos.speech.BriefSpeaker
 import app.kairos.speech.SpeakResult
@@ -46,6 +58,29 @@ class MainActivity : ComponentActivity() {
 
     /** İzin durumu; kullanıcı Android ayarlarından dönünce (onResume) yenilenir. */
     private val reliability = mutableStateOf<ReliabilityStatus?>(null)
+
+    /** Kayıttan sonraki izin penceresi: uygulama her açılışta en fazla bir kez. */
+    private val showPermissionPrompt = mutableStateOf(false)
+    private var permissionPromptShown = false
+
+    private fun onReminderSaved() {
+        refreshReliability()
+        if (!permissionPromptShown && reliability.value?.blocking == true) {
+            permissionPromptShown = true
+            showPermissionPrompt.value = true
+        }
+    }
+
+    /** Ayarlar > Deneme bildirimi: 1 dakika sonra, gerçek hatırlatmayla aynı alarm yolundan. */
+    private fun sendTestNotification() {
+        if (!Reliability.notificationsAllowed(this)) {
+            reliabilityActions.fixNotifications()
+            return
+        }
+        val graph = KairosApp.graph(this)
+        graph.scheduler.scheduleTest(graph.clock.millis() + 60_000L)
+        Toast.makeText(this, "1 dakika içinde deneme bildirimi gelecek. Uygulamayı kapatıp bekleyebilirsiniz.", Toast.LENGTH_LONG).show()
+    }
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         refreshReliability()
@@ -68,7 +103,12 @@ class MainActivity : ComponentActivity() {
             },
             fixExactAlarms = { Reliability.startFirstAvailable(this, Reliability.exactAlarmIntents(this)) },
             fixBattery = { Reliability.startFirstAvailable(this, Reliability.batteryIntents(this)) },
-            openGuide = { reliability.value?.let { Reliability.startFirstAvailable(this, listOf(Reliability.guideIntent(it))) } },
+            // Önce üreticinin "otomatik başlatma" ekranı; yoksa telefona özel rehber.
+            openGuide = {
+                reliability.value?.let {
+                    Reliability.startFirstAvailable(this, Reliability.autostartIntents(it.vendor) + Reliability.guideIntent(it))
+                }
+            },
         )
     }
 
@@ -124,6 +164,8 @@ class MainActivity : ComponentActivity() {
         val store = graph.settings
         val homeFactory = viewModelFactory { initializer { HomeViewModel(graph.repository, store, graph.clock) } }
         val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
+        // Açılışta güncelleme denetimi (Ayarlar'dan kapatılabilir).
+        lifecycleScope.launch { if (store.current().updates.checkOnLaunch) graph.updates.check() }
 
         setContent {
             // Ayar okunana kadar hiçbir şey çizilmez; açılış penceresinin zemini görünür.
@@ -165,11 +207,21 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val showBanner = status.blocking && current.onboarding.dismissedReliability != status.signature
+                val updateState by graph.updates.state.collectAsState()
+                val showUpdate = !updateLater.value && (updateState is UpdateState.Available || updateState is UpdateState.Downloading)
+                if (showPermissionPrompt.value) {
+                    PermissionPrompt(status, reliabilityActions, onDismiss = { showPermissionPrompt.value = false })
+                }
                 HomeRoute(
                     vm = viewModel(factory = homeFactory),
-                    banner = if (!showBanner) null else {
+                    onSaved = ::onReminderSaved,
+                    banner = if (!showBanner && !showUpdate) null else {
                         {
-                            ReliabilityBanner(
+                            if (showUpdate) {
+                                UpdateBanner(updateState, onUpdate = ::startUpdate, onLater = { updateLater.value = true })
+                                if (showBanner) androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.height(12.dp))
+                            }
+                            if (showBanner) ReliabilityBanner(
                                 status,
                                 onFix = if (!status.notificationsAllowed) reliabilityActions.fixNotifications else reliabilityActions.fixExactAlarms,
                                 onDismiss = {
@@ -179,6 +231,11 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     settingsContent = { padding ->
+                        // Ses listesi sadece Ayarlar açıldığında ve özet açıksa yüklenir (motoru boşuna başlatmamak için).
+                        var voices by remember { mutableStateOf<List<VoiceOption>?>(null) }
+                        LaunchedEffect(current.brief.enabled) {
+                            if (current.brief.enabled && voices == null) voices = VoiceCatalog.load(this@MainActivity)
+                        }
                         SettingsScreen(
                             settings = current,
                             onUpdate = { change -> scope.launch { store.update(change) } },
@@ -190,6 +247,15 @@ class MainActivity : ComponentActivity() {
                             reliabilityActions = reliabilityActions,
                             onExport = { exportLauncher.launch(backup.suggestedName()) },
                             onImport = { importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
+                            onTestNotification = ::sendTestNotification,
+                            voices = voices,
+                            updateStatus = updateStatusText(updateState),
+                            onCheckUpdate = {
+                                if (updateState is UpdateState.Available || updateState is UpdateState.Failed && (updateState as UpdateState.Failed).update != null) startUpdate()
+                                else graph.updates.check()
+                            },
+                            onPreviewVoice = { name -> previewBrief(BriefText.sentence(4, 0, 8 * 60, current.brief.copy(enabled = true, whenNone = app.kairos.data.settings.WhenNone.SAY_NONE)) ?: "", current, name) },
+                            onInstallVoice = { Reliability.startFirstAvailable(this@MainActivity, VoiceCatalog.installIntents(this@MainActivity)) },
                         )
                     },
                 )
@@ -200,13 +266,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** "Sonra" denirse bu açılışta güncelleme şeridi gösterilmez. */
+    private val updateLater = mutableStateOf(false)
+
+    /** Güncelle: yükleme izni yoksa önce o ekranı açar; varsa indirip kurulumu başlatır. */
+    private fun startUpdate() {
+        val updates = KairosApp.graph(this).updates
+        val update = when (val s = updates.state.value) {
+            is UpdateState.Available -> s.update
+            is UpdateState.Failed -> s.update
+            else -> null
+        } ?: return
+        if (!UpdateInstaller.canInstall(this)) {
+            Toast.makeText(this, "Kairos'un güncelleme kurabilmesi için açılan ekranda izin verin, sonra tekrar Güncelle'ye basın.", Toast.LENGTH_LONG).show()
+            runCatching { startActivity(UpdateInstaller.permissionIntent(this)) }
+            return
+        }
+        updates.downloadAndInstall(update)
+    }
+
     private var previewSpeaker: BriefSpeaker? = null
 
     /** Ayarlar > "Dinle": örnek cümleyi seçili ses ve hızla hemen okur. */
-    private fun previewBrief(text: String, settings: AppSettings) {
+    private fun previewBrief(text: String, settings: AppSettings, voiceName: String? = settings.brief.voiceName) {
         if (previewSpeaker != null) return
         previewSpeaker = BriefSpeaker(this).also { s ->
-            s.speak(text, settings.brief.channel, settings.brief.speechRate) { result ->
+            s.speak(text, settings.brief.channel, settings.brief.speechRate, voiceName) { result ->
                 previewSpeaker = null
                 if (result == SpeakResult.NO_TURKISH_VOICE) {
                     Toast.makeText(this, "Telefonunuzda Türkçe ses yüklü değil. Android ayarlarında Metin okuma bölümünden yükleyebilirsiniz.", Toast.LENGTH_LONG).show()

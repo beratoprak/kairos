@@ -1,5 +1,10 @@
 package app.kairos.ui.home
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,20 +50,54 @@ import app.kairos.ui.theme.TimeStyles
 @Composable
 fun TimelineRow(row: RowUi, onCheck: (() -> Unit)?, modifier: Modifier = Modifier, onOpen: (() -> Unit)? = null) {
     val c = Kairos.colors
-    Row(
+    val timeWidth = timeColumnWidth(row.time)
+    BoxWithConstraints(
         modifier
             .fillMaxWidth()
             .background(c.ground)
             .then(if (onOpen != null) Modifier.clickable(onClickLabel = "Düzenle", onClick = onOpen) else Modifier),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        // Başlığa en az ~180 dp kalmıyorsa (dar ekran, büyük yazı) saat başlığın üstüne alınır;
+        // kelimeler ortadan bölünmez.
+        if (maxWidth - timeWidth - 58.dp < 180.dp) {
+            StackedRow(row, onCheck)
+        } else {
+            SideBySideRow(row, onCheck, timeWidth)
+        }
+    }
+}
+
+@Composable
+private fun StackedRow(row: RowUi, onCheck: (() -> Unit)?) {
+    val c = Kairos.colors
+    Column {
+        Hairline(color = if (row.isNext) c.accent else c.line, thickness = if (row.isNext) 2.dp else 1.dp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CheckCircle(checked = row.isDone, onClick = onCheck, label = if (row.isDone) "Tamamlandı" else "Tamamlandı olarak işaretle")
+            Text(
+                row.time,
+                style = TimeStyles.Row,
+                color = if (row.isDone) c.inkFaint else c.ink,
+                textDecoration = if (row.isDone) TextDecoration.LineThrough else null,
+            )
+        }
+        RowText(row, Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 12.dp))
+    }
+}
+
+@Composable
+private fun SideBySideRow(row: RowUi, onCheck: (() -> Unit)?, timeWidth: Dp) {
+    val c = Kairos.colors
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(
             row.time,
             style = TimeStyles.Row,
+            maxLines = 1,
+            softWrap = false,
             color = if (row.isDone) c.inkFaint else c.ink,
             textDecoration = if (row.isDone) TextDecoration.LineThrough else null,
             textAlign = TextAlign.End,
-            modifier = Modifier.width(56.dp).padding(top = 14.dp),
+            modifier = Modifier.width(timeWidth).padding(top = 14.dp),
         )
         Column(Modifier.weight(1f)) {
             Hairline(color = if (row.isNext) c.accent else c.line, thickness = if (row.isNext) 2.dp else 1.dp)
@@ -83,8 +122,7 @@ private fun RowText(row: RowUi, modifier: Modifier = Modifier) {
             row.title,
             style = MaterialTheme.typography.titleMedium,
             color = if (row.isDone) c.inkFaint else c.ink,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
+            // Başlık kesilmez; uzunsa alt satırlara geçer.
         )
         if (row.meta != null || row.important) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -206,3 +244,17 @@ private fun RowScope.SwipeBackground(action: SwipeAction, alignStart: Boolean) {
 }
 
 private data class Quad(val bg: Color, val fg: Color, val icon: ImageVector?, val label: String)
+
+/**
+ * Saat sütununun genişliği: o yazı boyutunda en geniş saat metni ("00:00" ya da "12:00 ÖS")
+ * kadar. Böylece büyük yazı boyutunda saat kesilmez, satırlar yine aynı hizada kalır.
+ */
+@Composable
+private fun timeColumnWidth(sample: String): Dp {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val widest = if (sample.contains('Ö')) "12:00 ÖS" else "00:00"
+    return remember(widest, density) {
+        with(density) { measurer.measure(widest, TimeStyles.Row).size.width.toDp() }
+    }.coerceAtLeast(56.dp)
+}

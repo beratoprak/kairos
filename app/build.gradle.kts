@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -20,14 +22,39 @@ android {
         applicationId = "app.kairos"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.1.2"
+        // Uygulama içi güncelleme: yeni sürümlerin yayınlandığı GitHub deposu (sahip/ad).
+        buildConfigField("String", "UPDATE_REPO", "\"beratoprak/kairos\"")
+    }
+
+    // Yayın imzası: anahtar ve şifresi proje dışında, ~/.kairos-keys/ altında (git'e ve iCloud'a girmez).
+    // Dosya yoksa release derlemesi imzasız çıkar; debug derlemesi etkilenmez.
+    val keyProps = Properties().apply {
+        val f = file("${System.getProperty("user.home")}/.kairos-keys/keystore.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    signingConfigs {
+        if (keyProps.isNotEmpty()) {
+            create("release") {
+                storeFile = file(keyProps.getProperty("storeFile"))
+                storePassword = keyProps.getProperty("storePassword")
+                keyAlias = keyProps.getProperty("keyAlias")
+                keyPassword = keyProps.getProperty("keyPassword")
+                storeType = "PKCS12"
+                // v2: hızlı ve tam APK bütünlüğü; v3: ileride anahtar değişimine (rotation) izin verir.
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 
@@ -42,6 +69,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {

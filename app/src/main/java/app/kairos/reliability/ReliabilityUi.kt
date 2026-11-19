@@ -1,5 +1,6 @@
 package app.kairos.reliability
 
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,10 +52,15 @@ fun ReliabilityChecklist(status: ReliabilityStatus, actions: ReliabilityActions,
         )
         if (status.vendor?.aggressive == true) {
             Hairline(Modifier.padding(start = 16.dp))
+            val hasAutostart = Reliability.autostartIntents(status.vendor).isNotEmpty()
             CheckRow(
                 "${status.vendorName.ifEmpty { "Bu" }} telefonlar",
-                "Bazı üreticiler uygulamaları arka planda durdurur. Telefonunuza özel adımlar için rehbere bakın.",
-                ok = null, action = "Rehber", onAction = actions.openGuide,
+                if (hasAutostart) {
+                    "Bu telefonlar uygulamaları arka planda durdurur; hatırlatma ancak uygulama açılınca gelir. “Otomatik başlatma”da Kairos'u açın."
+                } else {
+                    "Bazı üreticiler uygulamaları arka planda durdurur. Telefonunuza özel adımlar için rehbere bakın."
+                },
+                ok = null, action = if (hasAutostart) "Aç" else "Rehber", onAction = actions.openGuide,
             )
         }
     }
@@ -67,15 +73,38 @@ fun ReliabilityChecklist(status: ReliabilityStatus, actions: ReliabilityActions,
 @Composable
 private fun CheckRow(title: String, detail: String, ok: Boolean?, action: String, onAction: () -> Unit, strong: Boolean = true) {
     val c = Kairos.colors
+    // Büyük yazı boyutunda açıklama ile düğme yan yana sığmaz: düğme açıklamanın altına geçer.
+    val stacked = LocalDensity.current.fontScale > 1.3f
+    val texts: @Composable (Modifier) -> Unit = { m ->
+        Column(m, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = c.ink)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = c.inkMuted)
+        }
+    }
+    if (stacked) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            texts(Modifier.fillMaxWidth())
+            CheckAction(ok, action, onAction, strong)
+        }
+        return
+    }
     Row(
         Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = c.ink)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = c.inkMuted)
-        }
+        texts(Modifier.weight(1f))
+        CheckAction(ok, action, onAction, strong)
+    }
+}
+
+@Composable
+private fun CheckAction(ok: Boolean?, action: String, onAction: () -> Unit, strong: Boolean) {
+    val c = Kairos.colors
+    run {
         if (ok == true) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(KairosIcons.Check, contentDescription = null, tint = c.primary.takeIf { !c.isDark } ?: c.accent, modifier = Modifier.size(16.dp))
@@ -109,13 +138,11 @@ fun ReliabilityBanner(status: ReliabilityStatus, onFix: () -> Unit, onDismiss: (
     val shape = RoundedCornerShape(12.dp)
     val text = when {
         !status.notificationsAllowed -> "Bildirim izni kapalı. Hatırlatmalar görünmez."
-        else -> "Tam saatinde alarm izni kapalı. Hatırlatmalar birkaç dakika gecikebilir."
+        else -> "“Alarmlar ve hatırlatıcılar” izni kapalı. Hatırlatmalar geç gelebilir; uygulama kapalıyken hiç gelmeyebilir."
     }
-    Row(
-        modifier.fillMaxWidth().clip(shape).border(1.dp, c.overdue, shape).padding(start = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text, style = MaterialTheme.typography.bodySmall, color = c.ink, modifier = Modifier.weight(1f).padding(vertical = 12.dp))
+    Column(modifier.fillMaxWidth().clip(shape).border(1.dp, c.overdue, shape).padding(start = 14.dp, top = 12.dp)) {
+        Text(text, style = MaterialTheme.typography.bodySmall, color = c.ink, modifier = Modifier.padding(end = 14.dp))
+        Row(Modifier.align(Alignment.End), verticalAlignment = Alignment.CenterVertically) {
         Text(
             "Aç",
             style = MaterialTheme.typography.labelLarge,
@@ -128,5 +155,38 @@ fun ReliabilityBanner(status: ReliabilityStatus, onFix: () -> Unit, onDismiss: (
             color = c.inkMuted,
             modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClick = onDismiss).padding(end = 12.dp, start = 4.dp, top = 12.dp, bottom = 12.dp),
         )
+        }
     }
+}
+
+/**
+ * Hatırlatma kaydedildikten sonra, hatırlatmaların zamanında gelmesini engelleyen bir izin kapalıysa
+ * bir kez gösterilir (uygulama her açılışta en fazla bir kez). Zorlamaz: "Şimdi değil" her zaman var.
+ */
+@Composable
+fun PermissionPrompt(status: ReliabilityStatus, actions: ReliabilityActions, onDismiss: () -> Unit) {
+    val c = Kairos.colors
+    val (title, text, fix) = if (!status.notificationsAllowed) {
+        Triple(
+            "Bildirimlere izin verin",
+            "Bildirim izni kapalı olduğu için hatırlatmalarınız görünmeyecek. İzin verirseniz zamanı gelince bildirim olarak gelir.",
+            actions.fixNotifications,
+        )
+    } else {
+        Triple(
+            "Hatırlatmalar zamanında gelsin",
+            "Telefonunuz şu an hatırlatmaları geciktirebilir; uygulama kapalıyken bildirim gelmeyebilir. Açılan ekranda “Alarmlar ve hatırlatıcılar” iznini açın.",
+            actions.fixExactAlarms,
+        )
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surface,
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 0.dp,
+        title = { Text(title, style = MaterialTheme.typography.titleLarge, color = c.ink) },
+        text = { Text(text, style = MaterialTheme.typography.bodyMedium, color = c.ink) },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { fix(); onDismiss() }) { Text("İzni aç", color = c.ink) } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Şimdi değil", color = c.inkMuted) } },
+    )
 }
