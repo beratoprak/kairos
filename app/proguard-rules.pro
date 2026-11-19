@@ -1,0 +1,1 @@
+# KAİROS ProGuard kuralları

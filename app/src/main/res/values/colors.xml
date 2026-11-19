@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sadece açılış penceresi ve uygulama simgesi; uygulama renkleri Palettes.kt'dedir. -->
+    <color name="banker_ground">#FFEEF0EC</color>
+    <color name="banker_primary">#FF1F4A38</color>
+    <color name="grafit_ground">#FF141614</color>
+</resources>

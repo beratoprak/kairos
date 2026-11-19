@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Hatırlatma bildirimleri (Android 13+ kullanıcı izni). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Tam saatinde hatırlatma. Kullanıcı izni; USE_EXACT_ALARM bilerek kullanılmaz (KURALLAR §3.4). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Yeniden başlatma sonrası alarmları geri kurmak için. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Bildirim gösterilirken cihazın uykuya dalmaması için kısa süreli. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Günlük sesli özet birkaç saniyelik ön plan servisinde okunur (Android arka plan sesini kısabilir). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+
+    <!-- Android 11+: telefondaki metin okuma (TTS) motorunu görebilmek için. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".KairosApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Kairos">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Kurulan alarm çaldığında bildirimi gösterir. -->
+        <receiver
+            android:name=".alarm.ReminderAlarmReceiver"
+            android:exported="false" />
+
+        <!-- Bildirimdeki Tamamlandı / Ertele düğmeleri. -->
+        <receiver
+            android:name=".notification.ActionReceiver"
+            android:exported="false" />
+
+        <!-- Günlük sesli özet: sadece kullanıcı açtıysa kurulur. -->
+        <receiver
+            android:name=".speech.BriefReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".speech.DailyBriefService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted" />
+
+        <!-- Sistem yayınlarını alabilmesi için dışa açık olmak zorunda. Telefon yeniden başladığında,
+             kullanıcı kilidi ilk kez açınca çalışır (veriler normal, şifreyle korunan alanda). -->
+        <receiver
+            android:name=".alarm.RescheduleReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>
